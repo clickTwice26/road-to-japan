@@ -128,7 +128,11 @@ class Settings(BaseSettings):
             "CACHE_REDIS_URL": self.REDIS_CACHE_URL,
             "CACHE_DEFAULT_TIMEOUT": self.CACHE_DEFAULT_TIMEOUT,
             "CACHE_KEY_PREFIX": f"{self.APP_NAME}:cache:",
-            # Flask-Limiter
+            # Flask-Limiter. RATELIMIT_DEFAULT must arrive via config: the
+            # limiter parses it during init_app, so assigning the attribute
+            # afterwards silently leaves the default limit unregistered.
+            "RATELIMIT_ENABLED": self.ENV != "testing",
+            "RATELIMIT_DEFAULT": self.RATELIMIT_DEFAULT,
             "RATELIMIT_STORAGE_URI": self.REDIS_LIMITER_URL,
             "RATELIMIT_STRATEGY": "moving-window",
             "RATELIMIT_HEADERS_ENABLED": True,

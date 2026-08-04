@@ -47,7 +47,6 @@ def _init_extensions(app: Flask, settings: Settings) -> None:
     migrate.init_app(app, db, directory="migrations", compare_type=True)
     cache.init_app(app)
     limiter.init_app(app)
-    limiter.default_limits = [settings.RATELIMIT_DEFAULT]
     cors.init_app(
         app,
         resources={rf"{settings.API_PREFIX}/*": {"origins": settings.CORS_ORIGINS}},

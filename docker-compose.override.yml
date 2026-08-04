@@ -8,13 +8,17 @@
 # ---------------------------------------------------------------------------
 
 services:
+  # Host port mappings are separate variables from POSTGRES_PORT/REDIS_PORT:
+  # those describe the *in-container* ports the app dials over the Compose
+  # network, and must stay 5432/6379. Change the ones below when another stack
+  # already owns the default host port.
   postgres:
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
 
   redis:
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "${REDIS_HOST_PORT:-6379}:6379"
 
   web:
     build:

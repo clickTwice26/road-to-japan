@@ -17,7 +17,7 @@ from sqlalchemy import create_engine, text
 
 from app import create_app
 from app.config import Settings, get_settings
-from app.extensions import cache, db, limiter
+from app.extensions import cache, db
 
 TEST_DB_SUFFIX = "_test"
 TEST_CACHE_DB = 15
@@ -68,9 +68,9 @@ def _create_test_database(settings: Settings) -> Iterator[None]:
 
 @pytest.fixture(scope="session")
 def app(settings: Settings, _create_test_database: None) -> Iterator[Flask]:
+    # ENV="testing" disables the rate limiter via RATELIMIT_ENABLED, so
+    # repeated POSTs across the suite never trip the per-minute cap.
     application = create_app(settings)
-    # Rate limiting would make repeated POSTs in the suite flaky.
-    limiter.enabled = False
 
     with application.app_context():
         db.create_all()

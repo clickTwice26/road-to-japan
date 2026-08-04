@@ -16,7 +16,11 @@ Flask-Migrate==4.1.0
 psycopg[binary,pool]==3.3.4
 
 # --- Redis: cache, rate limiting, sessions ---------------------------------
-redis==8.1.0
+# redis-py is held at 7.4.1, not 8.1.0: Flask-Limiter's storage layer (`limits`,
+# currently 5.8.0) declares `redis<8.0.0`, so 8.x makes the graph unresolvable.
+# This caps the *client* only — the Redis server in Compose is 8.x.
+# Revisit when `limits` lifts the bound: https://github.com/alisaifee/limits
+redis==7.4.1
 Flask-Caching==2.4.1
 Flask-Limiter[redis]==4.1.1
 
