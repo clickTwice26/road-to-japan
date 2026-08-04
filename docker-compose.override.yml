@@ -1,0 +1,36 @@
+# ---------------------------------------------------------------------------
+# Development overrides — Compose applies this automatically on top of
+# docker-compose.yml. It swaps the app to the `dev` image with the source
+# bind-mounted for hot reload, and publishes the database ports to the host.
+#
+# To run the production configuration locally instead:
+#   docker compose -f docker-compose.yml up --build
+# ---------------------------------------------------------------------------
+
+services:
+  postgres:
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+
+  redis:
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+
+  web:
+    build:
+      target: dev
+    image: roadtojapan-web:dev
+    command: ["flask", "run", "--host=0.0.0.0", "--port=8000", "--reload"]
+    environment:
+      ENV: development
+      DEBUG: "true"
+      LOG_LEVEL: DEBUG
+      LOG_JSON: "false"
+      DB_ECHO: ${DB_ECHO:-false}
+      RUN_SEED: ${RUN_SEED:-1}
+    volumes:
+      # Source is mounted read-write so `flask db migrate` writes new revisions
+      # back to the host. The venv lives in /opt/venv and is unaffected.
+      - .:/app
+    stdin_open: true
+    tty: true

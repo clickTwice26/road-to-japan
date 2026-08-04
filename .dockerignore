@@ -1,0 +1,37 @@
+.git
+.gitignore
+.github
+
+.env
+.env.*
+!.env.example
+
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+.venv/
+venv/
+env/
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+.idea/
+.vscode/
+.DS_Store
+
+docs/
+*.md
+!README.md
+
+# NOTE: tests/ is intentionally NOT ignored — the `dev` stage runs the suite.
+# The `production` stage copies only app/, migrations/ and the entrypoints,
+# so test code never reaches the shipped image.

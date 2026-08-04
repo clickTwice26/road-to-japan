@@ -1,0 +1,106 @@
+# ---------------------------------------------------------------------------
+# Base stack: Postgres 18, Redis 8, and the Flask app built for production.
+# `docker-compose.override.yml` is applied automatically and switches the app
+# to the dev image with hot reload — delete it (or use `-f docker-compose.yml`
+# alone) to run the production configuration locally.
+# ---------------------------------------------------------------------------
+
+name: roadtojapan
+
+x-app-env: &app-env
+  ENV: ${ENV:-production}
+  DEBUG: ${DEBUG:-false}
+  SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required - copy .env.example to .env}
+  APP_NAME: ${APP_NAME:-roadtojapan}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  LOG_JSON: ${LOG_JSON:-true}
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: 5432
+  POSTGRES_DB: ${POSTGRES_DB:-roadtojapan}
+  POSTGRES_USER: ${POSTGRES_USER:-roadtojapan}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+  REDIS_HOST: redis
+  REDIS_PORT: 6379
+
+services:
+  postgres:
+    image: postgres:18-trixie
+    container_name: roadtojapan-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-roadtojapan}
+      POSTGRES_USER: ${POSTGRES_USER:-roadtojapan}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      # scram-sha-256 for host connections; the default trusts anything on the
+      # bridge network, which is a footgun if a port ever gets published.
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --data-checksums"
+      PGDATA: /var/lib/postgresql/data/pgdata
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - max_connections=200
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - work_mem=8MB
+      - -c
+      - log_min_duration_statement=500
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-roadtojapan} -d ${POSTGRES_DB:-roadtojapan}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks: [backend]
+
+  redis:
+    image: redis:8-trixie
+    container_name: roadtojapan-redis
+    restart: unless-stopped
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    volumes:
+      - redis_data:/data
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    networks: [backend]
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: production
+    image: roadtojapan-web:latest
+    container_name: roadtojapan-web
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-1}
+      RUN_SEED: ${RUN_SEED:-0}
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-4}
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [backend]
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  backend:
+    driver: bridge
