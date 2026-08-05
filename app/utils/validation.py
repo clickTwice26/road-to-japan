@@ -4,27 +4,22 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from functools import wraps
-from typing import Any, TypeVar
+from typing import Any
 
 from flask import request
 from pydantic import BaseModel, ValidationError
 
 from app.errors import ValidationFailedError
 
-M = TypeVar("M", bound=BaseModel)
-F = TypeVar("F", bound=Callable[..., Any])
-
 
 def _fail(exc: ValidationError) -> ValidationFailedError:
-    return ValidationFailedError(
-        details=exc.errors(include_url=False, include_context=False)
-    )
+    return ValidationFailedError(details=exc.errors(include_url=False, include_context=False))
 
 
-def validate_body(model: type[M]) -> Callable[[F], F]:
+def validate_body[M: BaseModel](model: type[M]) -> Callable[[Callable], Callable]:
     """Parse and validate the JSON body, injecting it as the ``body`` kwarg."""
 
-    def decorator(fn: F) -> F:
+    def decorator(fn: Callable) -> Callable:
         @wraps(fn)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             payload = request.get_json(silent=True)
@@ -36,15 +31,15 @@ def validate_body(model: type[M]) -> Callable[[F], F]:
                 raise _fail(exc) from exc
             return fn(*args, **kwargs)
 
-        return wrapper  # type: ignore[return-value]
+        return wrapper
 
     return decorator
 
 
-def validate_query(model: type[M]) -> Callable[[F], F]:
+def validate_query[M: BaseModel](model: type[M]) -> Callable[[Callable], Callable]:
     """Validate the query string, injecting it as the ``query`` kwarg."""
 
-    def decorator(fn: F) -> F:
+    def decorator(fn: Callable) -> Callable:
         @wraps(fn)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
@@ -53,6 +48,6 @@ def validate_query(model: type[M]) -> Callable[[F], F]:
                 raise _fail(exc) from exc
             return fn(*args, **kwargs)
 
-        return wrapper  # type: ignore[return-value]
+        return wrapper
 
     return decorator

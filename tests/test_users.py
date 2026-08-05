@@ -35,9 +35,7 @@ def test_create_user_rejects_a_duplicate_email(client):
 
 
 def test_create_user_rejects_a_short_password(client):
-    resp = client.post(
-        BASE, json={"email": "x@example.com", "full_name": "X", "password": "short"}
-    )
+    resp = client.post(BASE, json={"email": "x@example.com", "full_name": "X", "password": "short"})
     assert resp.status_code == 422
     assert resp.get_json()["error"]["code"] == "validation_failed"
 

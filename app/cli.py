@@ -59,7 +59,7 @@ def wait_for_services(timeout: int) -> None:
                 probe()
                 click.secho(f"{name} is ready", fg="green")
                 break
-            except Exception as exc:  # noqa: BLE001 - retry loop
+            except Exception as exc:  # any failure means "not ready yet" — retry
                 if time.monotonic() > deadline:
                     raise SystemExit(f"{name} not ready after {timeout}s: {exc}") from exc
                 click.echo(f"waiting for {name}...")

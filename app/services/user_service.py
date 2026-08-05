@@ -45,7 +45,9 @@ def get_user(user_id: uuid.UUID) -> UserRead:
     return dto
 
 
-def list_users(page: int, per_page: int, *, active_only: bool = False) -> tuple[list[UserRead], int]:
+def list_users(
+    page: int, per_page: int, *, active_only: bool = False
+) -> tuple[list[UserRead], int]:
     stmt = select(User).order_by(User.created_at.desc())
     count_stmt = select(func.count()).select_from(User)
     if active_only:

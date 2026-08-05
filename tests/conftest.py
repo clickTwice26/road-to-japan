@@ -46,37 +46,45 @@ def settings() -> Settings:
     )
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def _create_test_database(settings: Settings) -> Iterator[None]:
     """Create the test database once per session, drop it at the end."""
-    admin_url = settings.SQLALCHEMY_DATABASE_URI.replace(
-        f"/{settings.POSTGRES_DB}", "/postgres"
-    )
-    engine = create_engine(admin_url, isolation_level="AUTOCOMMIT")
-    with engine.connect() as conn:
-        conn.execute(text(f'DROP DATABASE IF EXISTS "{settings.POSTGRES_DB}" WITH (FORCE)'))
-        conn.execute(text(f'CREATE DATABASE "{settings.POSTGRES_DB}"'))
-    engine.dispose()
+    admin_url = settings.SQLALCHEMY_DATABASE_URI.replace(f"/{settings.POSTGRES_DB}", "/postgres")
 
+    def _recreate(drop_only: bool = False) -> None:
+        engine = create_engine(admin_url, isolation_level="AUTOCOMMIT")
+        with engine.connect() as conn:
+            conn.execute(text(f'DROP DATABASE IF EXISTS "{settings.POSTGRES_DB}" WITH (FORCE)'))
+            if not drop_only:
+                conn.execute(text(f'CREATE DATABASE "{settings.POSTGRES_DB}"'))
+        engine.dispose()
+
+    _recreate()
     yield
-
-    engine = create_engine(admin_url, isolation_level="AUTOCOMMIT")
-    with engine.connect() as conn:
-        conn.execute(text(f'DROP DATABASE IF EXISTS "{settings.POSTGRES_DB}" WITH (FORCE)'))
-    engine.dispose()
+    _recreate(drop_only=True)
 
 
 @pytest.fixture(scope="session")
 def app(settings: Settings, _create_test_database: None) -> Iterator[Flask]:
-    # ENV="testing" disables the rate limiter via RATELIMIT_ENABLED, so
-    # repeated POSTs across the suite never trip the per-minute cap.
+    """The application under test.
+
+    Deliberately does NOT hold an app context open across tests. Flask reuses
+    an already-pushed app context for incoming test-client requests instead of
+    pushing its own, which means teardown_appcontext never fires and the
+    request's SQLAlchemy session lingers `idle in transaction` — holding an
+    AccessShareLock that makes the inter-test TRUNCATE block forever.
+    """
     application = create_app(settings)
 
     with application.app_context():
         db.create_all()
-        yield application
         db.session.remove()
+
+    yield application
+
+    with application.app_context():
         db.drop_all()
+        db.session.remove()
 
 
 @pytest.fixture(autouse=True)
@@ -87,8 +95,11 @@ def _clean_state(app: Flask) -> Iterator[None]:
         db.session.rollback()
         tables = ", ".join(f'"{t.name}"' for t in reversed(db.metadata.sorted_tables))
         if tables:
+            # Fail fast rather than hang if some connection leaked a transaction.
+            db.session.execute(text("SET LOCAL lock_timeout = '10s'"))
             db.session.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))
             db.session.commit()
+        db.session.remove()
         cache.clear()
 
 
@@ -105,6 +116,8 @@ def redis_client(settings: Settings) -> Iterator[redis_lib.Redis]:
 
 
 @pytest.fixture
-def session(app: Flask):
+def session(app: Flask) -> Iterator:
+    """A database session bound to its own app context."""
     with app.app_context():
         yield db.session
+        db.session.remove()

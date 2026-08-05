@@ -2,11 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Generic, TypeVar
-
 from pydantic import BaseModel, ConfigDict, Field
-
-T = TypeVar("T")
 
 
 class PaginationParams(BaseModel):
@@ -14,7 +10,7 @@ class PaginationParams(BaseModel):
     per_page: int = Field(default=20, ge=1, le=100)
 
 
-class Page(BaseModel, Generic[T]):
+class Page[T](BaseModel):
     items: list[T]
     page: int
     per_page: int

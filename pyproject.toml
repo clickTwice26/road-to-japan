@@ -15,6 +15,7 @@ select = [
     "N",        # pep8-naming
     "UP",       # pyupgrade
     "B",        # flake8-bugbear
+    "BLE",      # no blind `except Exception` outside probes
     "C4",       # comprehensions
     "SIM",      # simplify
     "S",        # bandit
